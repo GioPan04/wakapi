@@ -1,12 +1,13 @@
 package repositories
 
 import (
+	"time"
+
 	"github.com/duke-git/lancet/v2/slice"
 	conf "github.com/muety/wakapi/config"
 	"github.com/muety/wakapi/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"time"
 )
 
 type HeartbeatRepository struct {
@@ -247,6 +248,30 @@ func (r *HeartbeatRepository) GetUserProjectStats(user *models.User, from, to ti
 			"inner join projects using (project, user_id) "+
 			"group by project, language "+
 			"order by last desc", user.ID, from, to, limit, offset).
+		Scan(&projectStats).Error; err != nil {
+		return nil, err
+	}
+
+	return projectStats, nil
+}
+
+func (r *HeartbeatRepository) GetUserSingleProjectStats(user *models.User, from, to time.Time, project string, limit, offset int) (*models.ProjectStats, error) {
+	var projectStats *models.ProjectStats
+
+	// note: limit / offset doesn't really improve query performance
+	// query takes quite long, depending on the number of heartbeats (~ 7 seconds for ~ 500k heartbeats)
+	// TODO: refactor this to use summaries once we implemented persisting filtered, multi-interval summaries
+	// see https://github.com/muety/wakapi/issues/524#issuecomment-1731668391
+
+	// multi-line string with backticks yields an error with the github.com/glebarez/sqlite driver
+	if err := r.db.Raw("SELECT project, min(time) as first, max(time) as last, count(*) as count, first_value(language) over (partition by project order by count(*) desc) as top_language "+
+		"FROM heartbeats "+
+		"WHERE user_id = ? "+
+		"AND project == ? "+
+		"AND time BETWEEN ? AND ? "+
+		"AND language IS NOT NULL "+
+		"AND language != '' "+
+		"LIMIT ? OFFSET ?", user.ID, project, from, to, limit, offset).
 		Scan(&projectStats).Error; err != nil {
 		return nil, err
 	}

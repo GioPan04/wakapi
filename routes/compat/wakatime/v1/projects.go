@@ -35,6 +35,7 @@ func (h *ProjectsHandler) RegisterRoutes(router chi.Router) {
 	router.Group(func(r chi.Router) {
 		r.Use(middlewares.NewAuthenticateMiddleware(h.userSrvc).Handler)
 		r.Get("/compat/wakatime/v1/users/{user}/projects", h.Get)
+		r.Get("/compat/wakatime/v1/users/{user}/projects/{project}", h.GetSingle)
 	})
 }
 
@@ -79,5 +80,42 @@ func (h *ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vm := &v1.ProjectsViewModel{Data: projects}
+	helpers.RespondJSON(w, r, http.StatusOK, vm)
+}
+
+// @Summary Retrieve a single user's project
+// @Description Mimics https://wakatime.com/developers#projects
+// @ID get-wakatime-project
+// @Tags wakatime
+// @Produce json
+// @Param user path string true "User ID to fetch data for (or 'current')"
+// @Param project path string true "ID of the project"
+// @Security ApiKeyAuth
+// @Success 200 {object} v1.ProjectsViewModel
+// @Router /compat/wakatime/v1/users/{user}/projects/{project} [get]
+func (h *ProjectsHandler) GetSingle(w http.ResponseWriter, r *http.Request) {
+	user, err := routeutils.CheckEffectiveUser(w, r, h.userSrvc, "current")
+	if err != nil {
+		return // response was already sent by util function
+	}
+
+	results, err := h.heartbeatSrvc.GetUserSingleProjectStats(user, time.Time{}, utils.BeginOfToday(time.Local), chi.URLParam(r, "project"), nil, false)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("something went wrong"))
+		conf.Log().Request(r).Error(err.Error())
+		return
+	}
+
+	project := &v1.Project{
+		ID:                           results.Project,
+		Name:                         results.Project,
+		LastHeartbeatAt:              results.Last.T(),
+		HumanReadableLastHeartbeatAt: helpers.FormatDateTimeHuman(results.Last.T()),
+		UrlencodedName:               url.QueryEscape(results.Project),
+		CreatedAt:                    results.First.T(),
+	}
+
+	vm := &v1.ProjectViewModel{Data: project}
 	helpers.RespondJSON(w, r, http.StatusOK, vm)
 }

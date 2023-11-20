@@ -2,6 +2,11 @@ package services
 
 import (
 	"fmt"
+	"math"
+	"strings"
+	"sync"
+	"time"
+
 	datastructure "github.com/duke-git/lancet/v2/datastructure/set"
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/leandro-lugaresi/hub"
@@ -9,10 +14,6 @@ import (
 	"github.com/muety/wakapi/repositories"
 	"github.com/muety/wakapi/utils"
 	"github.com/patrickmn/go-cache"
-	"math"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/muety/wakapi/models"
 )
@@ -234,6 +235,30 @@ func (srv *HeartbeatService) GetUserProjectStats(user *models.User, from, to tim
 	if err == nil {
 		srv.cache.Set(cacheKey, results, 12*time.Hour)
 	}
+
+	go srv.populateUniqueUserProjects(user.ID)
+
+	return results, err
+}
+
+func (srv *HeartbeatService) GetUserSingleProjectStats(user *models.User, from, to time.Time, project string, pageParams *utils.PageParams, skipCache bool) (*models.ProjectStats, error) {
+	// for projects page, call this like: GetUserSingleProjectStats(&models.User{ID: "n1try"}, time.Time{}, utils.BeginOfToday(time.Local), false)
+
+	var (
+		limit  = math.MaxInt32
+		offset = 0
+	)
+
+	if pageParams != nil {
+		limit = pageParams.Limit()
+		offset = pageParams.Offset()
+	}
+
+	if to.IsZero() {
+		to = time.Now()
+	}
+
+	results, err := srv.repository.GetUserSingleProjectStats(user, from, to, project, limit, offset)
 
 	go srv.populateUniqueUserProjects(user.ID)
 

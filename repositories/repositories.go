@@ -1,8 +1,9 @@
 package repositories
 
 import (
-	"github.com/muety/wakapi/models"
 	"time"
+
+	"github.com/muety/wakapi/models"
 )
 
 type IAliasRepository interface {
@@ -34,6 +35,7 @@ type IHeartbeatRepository interface {
 	DeleteByUser(*models.User) error
 	DeleteByUserBefore(*models.User, time.Time) error
 	GetUserProjectStats(*models.User, time.Time, time.Time, int, int) ([]*models.ProjectStats, error)
+	GetUserSingleProjectStats(*models.User, time.Time, time.Time, string, int, int) (*models.ProjectStats, error)
 }
 
 type IDiagnosticsRepository interface {

@@ -1,11 +1,12 @@
 package services
 
 import (
+	"time"
+
 	datastructure "github.com/duke-git/lancet/v2/datastructure/set"
 	"github.com/muety/wakapi/models"
 	"github.com/muety/wakapi/models/types"
 	"github.com/muety/wakapi/utils"
-	"time"
 )
 
 type IAggregationService interface {
@@ -47,6 +48,7 @@ type IHeartbeatService interface {
 	DeleteByUser(*models.User) error
 	DeleteByUserBefore(*models.User, time.Time) error
 	GetUserProjectStats(*models.User, time.Time, time.Time, *utils.PageParams, bool) ([]*models.ProjectStats, error)
+	GetUserSingleProjectStats(*models.User, time.Time, time.Time, string, *utils.PageParams, bool) (*models.ProjectStats, error)
 }
 
 type IDiagnosticsService interface {
